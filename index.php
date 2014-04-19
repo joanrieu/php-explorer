@@ -1,6 +1,9 @@
 <?php
 
-// AUTO CONFIG
+$config = new StdClass;
+$config->showself = false;
+$config->showhidden = false;
+// AUTO PASSWORD CONFIG
 
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
 
@@ -121,19 +124,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $request->password = $_POST['password'];
     $request->directory = @$_POST['directory'];
 
-    $config = json_decode(file_get_contents(CONFIG_FILE));
-
     $auth = false;
 
-    if (isset($password64)) {
-        $auth = password_verify($request->password, base64_decode($password64));
+    if (isset($config->password64)) {
+        $auth = password_verify($request->password, base64_decode($config->password64));
     } else {
         $password = password_hash($request->password, PASSWORD_DEFAULT);
         file_put_contents(
             __FILE__,
             str_replace(
-                '// ' . 'AUTO CONFIG',
-                '$password64 = \'' . base64_encode($password) . '\';',
+                '// ' . 'AUTO PASSWORD CONFIG',
+                '$config->password64 = \'' . base64_encode($password) . '\';',
                 file_get_contents(__FILE__)
             )
         );
@@ -152,12 +153,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     if (!isset($request->directory))
         $request->directory = '.';
 
-    foreach (scandir($request->directory) as $name)
-        $listing[$name] = mime_content_type($request->directory . '/' . $name);
+    foreach (scandir($request->directory) as $name) {
+        $path = $request->directory . '/' . $name;
+        $show1 = $config->showself || realpath($name) !== realpath(__FILE__);
+        $show2 = $config->showhidden || $name === '.' || $name === '..' || $name[0] !== '.';
+        if ($show1 && $show2)
+            $listing[$name] = mime_content_type($path);
+    }
 
     die(json_encode([
-        directory => realpath($request->directory),
-        listing => $listing,
+        'directory' => realpath($request->directory),
+        'listing' => $listing,
     ]));
 
 }
